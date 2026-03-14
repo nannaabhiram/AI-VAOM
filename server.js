@@ -14,11 +14,61 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Supabase client initialization
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Supabase client initialization with fallback
+let supabase;
+let useInMemoryFallback = false;
+const inMemoryOrders = new Map();
+let orderIdCounter = 1;
+
+try {
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
+  );
+  // Test connection
+  supabase.from('orders').select('*').limit(1).then(({error}) => {
+    if (error) {
+      console.warn('⚠️ Supabase connection failed, using in-memory fallback:', error.message);
+      useInMemoryFallback = true;
+    } else {
+      console.log('✅ Supabase connected successfully');
+    }
+  });
+} catch (error) {
+  console.warn('⚠️ Supabase init failed, using in-memory fallback:', error.message);
+  useInMemoryFallback = true;
+  supabase = null;
+}
+
+// In-memory CRUD helpers
+async function getOrders() {
+  if (useInMemoryFallback) {
+    return Array.from(inMemoryOrders.values()).sort((a, b) => b.id - a.id);
+  }
+  const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function createOrder(orderData) {
+  if (useInMemoryFallback) {
+    const order = {
+      id: orderIdCounter++,
+      item: orderData.item,
+      quantity: orderData.quantity,
+      status: orderData.status || 'pending',
+      price: orderData.price || 0.0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    inMemoryOrders.set(order.id, order);
+    console.log('💾 Order saved to memory:', order);
+    return order;
+  }
+  const { data, error } = await supabase.from('orders').insert([orderData]).select().single();
+  if (error) throw error;
+  return data;
+}
 
 // In-memory session storage for context memory and confirmation state
 const sessionContext = new Map();
@@ -298,20 +348,11 @@ function handleVoiceIntent(voiceCommand) {
 // GET - Retrieve all orders
 app.get('/api/orders', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error fetching orders:', error);
-      return res.status(500).json({ error: 'Failed to fetch orders' });
-    }
-    
+    const data = await getOrders();
     res.json(data);
   } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
 
@@ -344,26 +385,17 @@ app.get('/api/orders/:id', async (req, res) => {
 // POST - Create new order
 app.post('/api/orders', async (req, res) => {
   try {
-    const { item, quantity, status = 'pending' } = req.body;
+    const { item, quantity, status = 'pending', price = 0.0 } = req.body;
     
     if (!item || !quantity) {
       return res.status(400).json({ error: 'Item and quantity are required' });
     }
     
-    const { data, error } = await supabase
-      .from('orders')
-      .insert([{ item, quantity, status }])
-      .select();
-    
-    if (error) {
-      console.error('Error creating order:', error);
-      return res.status(500).json({ error: 'Failed to create order' });
-    }
-    
-    res.status(201).json(data[0]);
+    const order = await createOrder({ item, quantity, status, price });
+    res.status(201).json(order);
   } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error creating order:', error);
+    res.status(500).json({ error: 'Failed to create order' });
   }
 });
 

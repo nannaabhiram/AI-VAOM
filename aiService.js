@@ -129,7 +129,7 @@ function fallbackParse(text) {
 }
 
 /**
- * Save order to Supabase database
+ * Save order to database via API
  * @param {Object} orderData - {item, quantity}
  * @returns {Promise<Object>} - Saved order or null if failed
  */
@@ -140,21 +140,24 @@ async function saveOrder(orderData) {
       return null;
     }
 
-    const { data, error } = await supabase
-      .from('orders')
-      .insert([{
+    // Use API endpoint instead of direct Supabase
+    const response = await fetch('http://localhost:3001/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         item: orderData.item,
         quantity: orderData.quantity,
-        status: 'pending'
-      }])
-      .select()
-      .single();
+        status: 'pending',
+        price: 0.0
+      })
+    });
 
-    if (error) {
-      console.error('Error saving order to Supabase:', error);
+    if (!response.ok) {
+      console.error('Error saving order:', response.statusText);
       return null;
     }
 
+    const data = await response.json();
     console.log('Order saved successfully:', data);
     return data;
 
