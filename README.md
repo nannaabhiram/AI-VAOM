@@ -9,15 +9,24 @@ A Node.js Express server with Supabase integration for managing orders through v
    npm install
    ```
 
-2. **Configure environment variables:**
-   - Copy `.env.example` to `.env`
-   - Update with your Supabase credentials:
+2. **Set up local Ollama model:**
+   - Install and start Ollama: https://ollama.com/download
+   - Pull your model:
+     ```bash
+     ollama pull llama3.2:1b
+     ```
+
+3. **Configure environment variables:**
+   - Create a `.env` file in the project root
+   - Add:
      ```env
      SUPABASE_URL=https://your-project-id.supabase.co
      SUPABASE_KEY=your_supabase_key_here
+     OLLAMA_BASE_URL=http://127.0.0.1:11434
+     OLLAMA_MODEL=llama3.2:1b
      ```
 
-3. **Set up Supabase database:**
+4. **Set up Supabase database:**
    Create an `orders` table with the following structure:
    ```sql
    CREATE TABLE orders (
@@ -30,7 +39,7 @@ A Node.js Express server with Supabase integration for managing orders through v
    );
    ```
 
-4. **Start the server:**
+5. **Start the server:**
    ```bash
    # Development mode
    npm run dev
@@ -111,6 +120,7 @@ The server includes comprehensive error handling for:
 The server uses:
 - **Express.js** for web framework
 - **Supabase** for database
+- **Ollama (`llama3.2:1b`)** for local intent parsing
 - **CORS** for cross-origin requests
 - **dotenv** for environment variables
 - **nodemon** for development auto-reload

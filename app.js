@@ -195,7 +195,7 @@ class VAOMApp {
                 }
             }
             
-            // Send to NEW Gemini AI endpoint
+            // Send to local AI endpoint
             const response = await fetch(`${this.apiBaseUrl}/voice-process`, {
                 method: 'POST',
                 headers: {
@@ -209,42 +209,42 @@ class VAOMApp {
                 })
             });
 
-            const geminiResponse = await response.json();
-            console.log('Gemini AI Response:', geminiResponse);
+            const aiResponse = await response.json();
+            console.log('AI Response:', aiResponse);
             
             // Apply optimistic UI immediately (before database confirms)
-            if (geminiResponse.optimistic_ui) {
-                this.applyOptimisticUI(geminiResponse.optimistic_ui);
+            if (aiResponse.optimistic_ui) {
+                this.applyOptimisticUI(aiResponse.optimistic_ui);
             }
             
             // Handle context reset
-            if (geminiResponse.context_reset) {
-                this.showToast('✏️ Correction processed: ' + geminiResponse.voice_response, 'info');
+            if (aiResponse.context_reset) {
+                this.showToast('✏️ Correction processed: ' + aiResponse.voice_response, 'info');
             }
             
             // Update analytics display
-            if (geminiResponse.analytics) {
-                this.updateAnalyticsDisplay(geminiResponse.analytics);
+            if (aiResponse.analytics) {
+                this.updateAnalyticsDisplay(aiResponse.analytics);
             }
             
             // Update last order ID from response
-            if (geminiResponse.data?.order_id) {
-                this.lastOrderId = geminiResponse.data.order_id;
+            if (aiResponse.data?.order_id) {
+                this.lastOrderId = aiResponse.data.order_id;
             }
             
             // Update total time saved
-            if (geminiResponse.analytics?.time_saved) {
-                this.totalTimeSaved += geminiResponse.analytics.time_saved;
+            if (aiResponse.analytics?.time_saved) {
+                this.totalTimeSaved += aiResponse.analytics.time_saved;
                 this.updateTimeSavedCounter();
             }
             
             // Show dashboard hint
-            if (geminiResponse.dashboard_hint) {
-                this.showToast(geminiResponse.dashboard_hint);
+            if (aiResponse.dashboard_hint) {
+                this.showToast(aiResponse.dashboard_hint);
             }
             
             // Execute the action
-            await this.executeGeminiAction(geminiResponse);
+            await this.executeAIAction(aiResponse);
             
         } catch (error) {
             console.error('Error processing voice command:', error);
@@ -491,8 +491,8 @@ class VAOMApp {
         }
     }
     
-    async executeGeminiAction(geminiResponse) {
-        const { action, data, voice_response, context_reset } = geminiResponse;
+    async executeAIAction(aiResponse) {
+        const { action, data, voice_response, context_reset } = aiResponse;
         
         // Always speak the response
         if (voice_response) {
@@ -562,7 +562,7 @@ class VAOMApp {
                     break;
             }
         } catch (error) {
-            console.error('Error executing Gemini action:', error);
+            console.error('Error executing AI action:', error);
         }
     }
     

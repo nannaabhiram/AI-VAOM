@@ -491,7 +491,7 @@ app.delete('/api/orders/:id', async (req, res) => {
   }
 });
 
-// NEW: Gemini AI-powered voice intent processing with optimistic UI
+// Local AI-powered voice intent processing with optimistic UI
 app.post('/api/voice-process', async (req, res) => {
   try {
     const { 
@@ -511,7 +511,7 @@ app.post('/api/voice-process', async (req, res) => {
       command.toLowerCase().includes(phrase)
     );
     
-    // Process voice command with Gemini AI
+    // Process voice command with local AI (Ollama)
     let extractedData;
     let contextReset = false;
     let action = 'CREATE';
@@ -533,7 +533,7 @@ app.post('/api/voice-process', async (req, res) => {
       // Normal order creation
       extractedData = await aiService.processVoiceCommand(command);
       action = extractedData?.action || 'CREATE';
-      console.log('Gemini extracted:', extractedData);
+      console.log('Ollama extracted:', extractedData);
     }
     
     // Kiosk mode: 3 words max response
@@ -611,12 +611,12 @@ app.post('/api/voice-process', async (req, res) => {
       }
     }
     
-    console.log('Gemini AI Processing:', response);
+    console.log('Local AI Processing:', response);
     
     res.json(response);
     
   } catch (error) {
-    console.error('Error processing voice with Gemini:', error);
+    console.error('Error processing voice with local AI:', error);
     res.status(500).json({ error: 'Failed to process voice command with AI' });
   }
 });

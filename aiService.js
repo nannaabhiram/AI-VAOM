@@ -1,13 +1,10 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const supabase = require('./db');
 require('dotenv').config();
 
-// Initialize Gemini 1.5 Flash
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:1b';
 
 /**
- * Process voice command using Gemini AI to extract item, quantity, and action
+ * Process voice command using local Ollama to extract item, quantity, and action
  * @param {string} text - Voice command text
  * @returns {Promise<Object>} - Extracted {item, quantity, action} or null if failed
  */
@@ -38,9 +35,27 @@ Rules:
 Text to parse: "${text}"
 `;
 
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const textResponse = response.text();
+    const ollamaResponse = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt,
+        stream: false,
+        options: {
+          temperature: 0.1
+        }
+      })
+    });
+
+    if (!ollamaResponse.ok) {
+      throw new Error(`Ollama request failed: ${ollamaResponse.status} ${ollamaResponse.statusText}`);
+    }
+
+    const payload = await ollamaResponse.json();
+    const textResponse = payload.response || '';
 
     // Extract JSON from response (handle potential markdown code blocks)
     let jsonStr = textResponse.trim();
@@ -50,6 +65,13 @@ Text to parse: "${text}"
       jsonStr = jsonStr.replace(/```json\n?/, '').replace(/```$/, '');
     } else if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replace(/```\n?/, '').replace(/```$/, '');
+    }
+
+    // Handle extra text around JSON by extracting the first JSON object
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
     }
     
     jsonStr = jsonStr.trim();
@@ -76,14 +98,14 @@ Text to parse: "${text}"
     };
 
   } catch (error) {
-    console.error('Error processing voice command with Gemini:', error);
-    // FALLBACK: Simple regex parser for demo
+    console.error('Error processing voice command with Ollama:', error.message);
+    // FALLBACK: Simple regex parser for resilience
     return fallbackParse(text);
   }
 }
 
 /**
- * Fallback parser when Gemini fails (e.g., invalid API key)
+ * Fallback parser when Ollama fails (e.g., model not running)
  * @param {string} text - Voice command text
  * @returns {Object} - Extracted {action, item, quantity}
  */
@@ -174,7 +196,7 @@ async function saveOrder(orderData) {
  */
 async function processAndSaveVoiceCommand(text) {
   try {
-    // Step 1: Extract action, item and quantity using Gemini AI
+    // Step 1: Extract action, item and quantity using Ollama
     const extracted = await processVoiceCommand(text);
     
     if (!extracted || extracted.action === 'IGNORE') {
